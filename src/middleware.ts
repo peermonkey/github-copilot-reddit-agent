@@ -1,7 +1,7 @@
 import { NextRequest } from 'next/server'
 
 // Middleware for authentication, rate limiting, etc.
-export function middleware(request: NextRequest) {
+export function middleware(_request: NextRequest) {
   // TODO: Add authentication checks
   // TODO: Add rate limiting
   // TODO: Add CORS handling
