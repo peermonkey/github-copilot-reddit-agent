@@ -1,0 +1,203 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// User management
+model User {
+  id            String    @id @default(cuid())
+  email         String    @unique
+  username      String?   @unique
+  passwordHash  String
+  role          UserRole  @default(USER)
+  isActive      Boolean   @default(true)
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  
+  // Relations
+  sessions      Session[]
+  botLogs       BotLog[]
+  
+  @@map("users")
+}
+
+model Session {
+  id        String   @id @default(cuid())
+  userId    String
+  token     String   @unique
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+  
+  // Relations
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  @@map("sessions")
+}
+
+// Bot configuration and management
+model BotConfig {
+  id                    String   @id @default(cuid())
+  isEnabled             Boolean  @default(false)
+  subreddits            String[] // Array of subreddit names
+  checkInterval         Int      @default(60000) // Milliseconds
+  maxCommentsPerHour    Int      @default(30)
+  responseTemplate      String?
+  keywords              String[] // Keywords to trigger responses
+  excludeKeywords       String[] // Keywords to avoid
+  minUpvotes            Int      @default(1)
+  maxCommentAge         Int      @default(86400) // Seconds
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+  
+  @@map("bot_configs")
+}
+
+model BotLog {
+  id          String     @id @default(cuid())
+  userId      String?
+  action      BotAction
+  subreddit   String
+  postId      String?
+  commentId   String?
+  content     String?
+  status      LogStatus
+  error       String?
+  metadata    Json?      // Additional data as JSON
+  createdAt   DateTime   @default(now())
+  
+  // Relations
+  user User? @relation(fields: [userId], references: [id])
+  
+  @@map("bot_logs")
+}
+
+// Reddit data caching
+model RedditPost {
+  id          String   @id // Reddit post ID
+  subreddit   String
+  title       String
+  content     String?
+  author      String
+  upvotes     Int      @default(0)
+  downvotes   Int      @default(0)
+  commentCount Int     @default(0)
+  url         String?
+  isProcessed Boolean  @default(false)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  redditCreatedAt DateTime
+  
+  // Relations
+  comments RedditComment[]
+  
+  @@map("reddit_posts")
+}
+
+model RedditComment {
+  id          String   @id // Reddit comment ID
+  postId      String
+  parentId    String? // Parent comment ID
+  content     String
+  author      String
+  upvotes     Int      @default(0)
+  downvotes   Int      @default(0)
+  isProcessed Boolean  @default(false)
+  botReplied  Boolean  @default(false)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  redditCreatedAt DateTime
+  
+  // Relations
+  post RedditPost @relation(fields: [postId], references: [id])
+  
+  @@map("reddit_comments")
+}
+
+// GitHub integration data
+model GitHubRepository {
+  id          String   @id @default(cuid())
+  repoId      String   @unique // GitHub repository ID
+  owner       String
+  name        String
+  fullName    String
+  isPrivate   Boolean  @default(false)
+  language    String?
+  stars       Int      @default(0)
+  forks       Int      @default(0)
+  issues      Int      @default(0)
+  isMonitored Boolean  @default(false)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  
+  // Relations
+  copilotUsage CopilotUsage[]
+  
+  @@map("github_repositories")
+}
+
+model CopilotUsage {
+  id           String   @id @default(cuid())
+  repositoryId String
+  userId       String?
+  suggestions  Int      @default(0)
+  acceptances  Int      @default(0)
+  language     String?
+  date         DateTime @default(now())
+  createdAt    DateTime @default(now())
+  
+  // Relations
+  repository GitHubRepository @relation(fields: [repositoryId], references: [id])
+  
+  @@map("copilot_usage")
+}
+
+// Analytics and metrics
+model Analytics {
+  id          String      @id @default(cuid())
+  metric      String      // Metric name
+  value       Float       // Metric value
+  category    String      // Category (bot, github, reddit, etc.)
+  tags        Json?       // Additional tags as JSON
+  timestamp   DateTime    @default(now())
+  
+  @@map("analytics")
+}
+
+// Enums
+enum UserRole {
+  ADMIN
+  MODERATOR
+  USER
+}
+
+enum BotAction {
+  COMMENT_POSTED
+  COMMENT_REPLIED
+  POST_ANALYZED
+  ERROR_OCCURRED
+  CONFIG_UPDATED
+  STARTUP
+  SHUTDOWN
+}
+
+enum LogStatus {
+  SUCCESS
+  ERROR
+  WARNING
+  INFO
+}
+
+// TODO: Add indexes for better performance
+// TODO: Add additional models as needed:
+// - WebhookEvents for GitHub/Reddit webhooks
+// - NotificationSettings for user preferences
+// - RateLimitStatus for API rate limiting tracking
+// - CacheEntries for general caching
+// - FeatureFlags for feature toggling
